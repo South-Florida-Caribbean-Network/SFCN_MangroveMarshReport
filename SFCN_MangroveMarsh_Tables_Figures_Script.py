@@ -137,9 +137,9 @@ def main():
         ########################
 
         #Summarize via a CrossTab/Pivot Table the Absolute Vegetation by Location Name (i.e. Point on Segment), by Community Type and Vegetation Type (Scale is Point - single value)
-        outVal = defineRecords_VegCoverByPointAbsolute()
+        outVal = defineRecords_AbsCoverByPoint()
         if outVal[0].lower() != "success function":
-            print("WARNING - Function defineRecords_VegCoverByPointAbsolute - Failed - Exiting Script")
+            print("WARNING - Function defineRecords_AbsCoverByPoint - Failed - Exiting Script")
             exit()
 
         scriptMsg = f"COMPLETE: SFCN_MangroveMash_Table_8-2 - {timeFun()}"
@@ -151,17 +151,17 @@ def main():
         ########################
 
         #Pull Stratum Cover Data by point in 'tbl_MarkerData'
-        outVal = defineRecords_CoverByStratum()
+        outVal = defineRecords_AbsCoverByStratum()
         if outVal[0].lower() != "success function":
-            print("WARNING - Function defineRecords_CoverByStratum - Failed - Exiting Script")
+            print("WARNING - Function defineRecords_AbsCoverByStratum - Failed - Exiting Script")
             exit()
 
         outDF = outVal[1]
 
         #Figures for Marker Point Stratum By Region - Stacked Top Marsh, Botom Mangrove
-        outVal = figure_CoverByStratum(outDF)
+        outVal = figure_AbsCoverByStratum(outDF)
         if outVal.lower() != "success function":
-            print("WARNING - Function figure_CoverByStratum - Failed - Exiting Script")
+            print("WARNING - Function figure_AbsCoverByStratum - Failed - Exiting Script")
             exit()
 
         scriptMsg = f"COMPLETE - SFCN_MangroveMash_Tables_Figures_8-3"
@@ -176,58 +176,9 @@ def main():
 
         logging.exception(f"WARNING Script Failed - {timeFun()}")
 
-#Summarize Mangrove Marsh Ecotone Values - Average Distance, Standard Error, Lower 95% Confidence Limit, Upper 95% Confidence Limit, Max and Min Values
-## Calculate the Confidence Interval Upper 95% and Lower 95% using Students T Distribution
-### Student T Distribution is defined as t_crit = np.abs(t.ppf((1-confidence)/2,dof))
-### CI Upper and lower is: (Mean +/- t_crit * SE)  
-#Output DataFrame with the summary values by Segment
-def SummarizeFigure8_1(inDF):
-    try:
-        # Calculate Average, Standard Error, and count of Distance 
-        outDf_8pt1 = (
-            inDF.groupby(['Event_Group_ID', 'Region', 'Segment'], as_index=False)
-            .agg(
-                AverageDist_M=('Distance', 'mean'),
-                StandardError=('Distance', 'sem'),
-                RecCount=('Distance', 'count'),
-                MinDifference=('Distance', 'min'),
-                MaxDifference=('Distance','max')
-            )
-            .assign(
-                DOF=lambda d: d.RecCount - 1,
-                t_crit=lambda d: np.abs(t.ppf((1 + confidence) / 2, d.DOF)),
-                LowerCI_95=lambda d: d.AverageDist_M - d.t_crit * d.StandardError,
-                UpperCI_95=lambda d: d.AverageDist_M + d.t_crit * d.StandardError,
-                SortField=lambda d: pd.to_numeric(
-                    d.Segment.str.extract(r'(\d+)')[0],
-                    errors='coerce',
-                    downcast='integer'
-                )
-            )
-            .sort_values('SortField')
-            .set_index('SortField')
-            .drop(columns=['DOF', 't_crit'])
-            )
-        
-        # Export Table to Excel
-        dateString = date.today().strftime("%Y%m%d")
-        outFull = os.path.join(outputDir, f"MangroveMarsh_Export_{dateString}.xlsx")
-        outDf_8pt1.to_excel(outFull, sheet_name = 'SOP8-1', index=False)
-
-        scriptMsg = f"EXPORTED Table 8-1 to: {outFull} - {timeFun()}"
-        print(scriptMsg)
-        logging.info(scriptMsg)
-        return "success function", outDf_8pt1
-
-    except:
-        print(f"Error on SummarizeFigure8_1 Function - {timeFun()}")
-        logging.exception("Error in SummarizeFigure8_1")
-        return "Failed function - 'SummarizeFigure8_1'"
-
 # QAQC the Vegetation Data
-## Check for correct relative cover (100%) across strata within community type / location
-## Check for correct relative cover (100%) within strata / community type / location
-def QAQC_RelativeCover1():
+## Check for correct relative cover (100%) ACROSS strata for each location / community type
+def defineRecords_QAQC_RelCoverByStratum():
     try:
         # get data from access
         inQuery = """
@@ -285,9 +236,68 @@ def QAQC_RelativeCover1():
         logging.exception("Error in QAQC_RelativeCover1")
         return "Failed function - 'QAQC_RelativeCover1'"
 
+## Check for correct relative cover (100%) WITHIN strata for each location / community type
+def defineRecords_QAQC_RelCoverByPoint():
+    try:
+        # get data from access
+        inQuery = """
+        SELECT 
+            Region,
+            Location_Name,
+            Segment,
+            MangroveSide_Cover_Overall,
+            MangroveSide_Cover_Tree,
+            MangroveSide_Cover_Shrub,
+            MangroveSide_Cover_Herb,
+            MarshSide_Cover_Overall,
+            MarshSide_Cover_Tree,
+            MarshSide_Cover_Shrub,
+            MarshSide_Cover_Herb
+        FROM 
+            (tbl_MarkerData
+            INNER JOIN tbl_Events 
+                ON tbl_MarkerData.Event_ID = tbl_Events.Event_ID)
+            INNER JOIN tbl_Locations 
+                ON tbl_Events.Location_ID = tbl_Locations.Location_ID
+        """
+        outVal = connect_to_AccessDB(inQuery, inDB)
+
+        if outVal[0].lower() != "success function":
+            print(f"QAQC_RelativeCover1 Database Query - FAILED - Exiting Script - {timeFun()}")
+            return
+
+        outDF = outVal[1]
+
+        # sum relative cover and check
+        outDF["sum_mangrove"] = outDF[
+            ["MangroveSide_Cover_Tree", "MangroveSide_Cover_Shrub", "MangroveSide_Cover_Herb"]
+        ].sum(axis=1)
+
+        outDF["sum_marsh"] = outDF[
+            ["MarshSide_Cover_Tree", "MarshSide_Cover_Shrub", "MarshSide_Cover_Herb"]
+        ].sum(axis=1)
+
+        outDF["mangrove_is_100"] = outDF["sum_mangrove"] == 100
+        outDF["marsh_is_100"] = outDF["sum_marsh"] == 100
+
+        # Append DataFrame to existing excel file
+        outFull = os.path.join(outputDir, f"MangroveMarsh_Export_{dateString}.xlsx")
+
+        with pd.ExcelWriter(outFull, mode='a', engine="openpyxl") as writer:
+            outDF.to_excel(writer, sheet_name='QAQC-2-RelCov', index=False)
+
+        scriptMsg = f"EXPORTED Table QAQC-2-RelCover to {outFull} - {timeFun()}"
+        print(scriptMsg)
+        logging.info(scriptMsg)
+
+    except:
+        print(f"Error on QAQC_RelativeCover2 Function - {timeFun()}")
+        logging.exception("Error in QAQC_RelativeCover2")
+        return "Failed function - 'QAQC_RelativeCover2'"
+
 # Summarize via a CrossTab/Pivot Table the Absolute Cover By Region, Community, Strata and Taxon across point locations
 #Export By Region
-def defineRecords_VegCoverByPointAbsolute():
+def defineRecords_AbsCoverByPoint():
 
     try:
         dateString = date.today().strftime("%Y%m%d")
@@ -312,11 +322,11 @@ def defineRecords_VegCoverByPointAbsolute():
             outVal = connect_to_AccessDB(inQuery, inDB)
 
             if outVal[0].lower() != "success function":
-                print(f"WARNING - Function defineRecords_VegCoverBySegment - Failed - Exiting Script- {timeFun()}")
+                print(f"WARNING - Function defineRecords_AbsCoverByPoint - Failed - Exiting Script- {timeFun()}")
                 exit()
 
             outDF = outVal[1]
-            print(f"Success: defineRecords_VegCoverBySegment - {timeFun()}")
+            print(f"Success: defineRecords_AbsCoverByPoint - {timeFun()}")
 
             # Append DataFrame to existing excel file
             outFull = os.path.join(outputDir, f"MangroveMarsh_Export_{dateString}.xlsx")
@@ -330,12 +340,40 @@ def defineRecords_VegCoverByPointAbsolute():
 
         return "success function", outDF
     except:
-        print(f"Error on defineRecords_VegCoverByPointAbsolute - {timeFun()}")
-        logging.exception("WARNING Script Failed - defineRecords_VegCoverByPointAbsolute")
-        return "Failed function - 'defineRecords_VegCoverByPointAbsolute'"
+        print(f"Error on defineRecords_AbsCoverByPoint - {timeFun()}")
+        logging.exception("WARNING Script Failed - defineRecords_AbsCoverByPoint")
+        return "Failed function - 'defineRecords_AbsCoverByPoint'"
+
+#Calculate Absolute Cover By Stratum and Community type in table 'tbl_MarkerData'
+def defineRecords_AbsCoverByStratum():
+    try:
+        inQuery = "SELECT tbl_Locations.Location_ID, tbl_Locations.Order_ID,  tbl_Locations.Region, tbl_Locations.Location_Name,  tbl_Events.Event_ID, tbl_Event_Group.Start_Date, tbl_MarkerData.MangroveSide_Cover_Overall,"\
+                " tbl_MarkerData.MangroveSide_Cover_Tree, tbl_MarkerData.MangroveSide_Cover_Shrub, tbl_MarkerData.MangroveSide_Cover_Herb, [MangroveSide_Cover_Overall]*([MangroveSide_Cover_Tree]/100)"\
+                " AS AbsCover_Mangrove_Tree, [MangroveSide_Cover_Overall]*([MangroveSide_Cover_Shrub]/100) AS AbsCover_Mangrove_Shrub, [MangroveSide_Cover_Overall]*([MangroveSide_Cover_Herb]/100)"\
+                " AS AbsCover_Mangrove_Herb, tbl_MarkerData.MarshSide_Cover_Overall, tbl_MarkerData.MarshSide_Cover_Tree, tbl_MarkerData.MarshSide_Cover_Shrub, tbl_MarkerData.MarshSide_Cover_Herb,"\
+                " [MarshSide_Cover_Overall]*([MarshSide_Cover_Tree]/100) AS AbsCover_Marsh_Tree, [MarshSide_Cover_Overall]*([MarshSide_Cover_Shrub]/100) AS AbsCover_Marsh_Shrub,"\
+                " [MarshSide_Cover_Overall]*([MarshSide_Cover_Herb]/100) AS AbsCover_Marsh_Herb"\
+                " FROM tbl_Locations INNER JOIN ((tbl_Event_Group INNER JOIN tbl_Events ON (tbl_Event_Group.Event_Group_ID = tbl_Events.Event_Group_ID) AND (tbl_Event_Group.Event_Group_ID"\
+                " = tbl_Events.Event_Group_ID)) INNER JOIN tbl_MarkerData ON (tbl_Events.Event_ID = tbl_MarkerData.Event_ID) AND (tbl_Events.Event_ID = tbl_MarkerData.Event_ID))"\
+                " ON tbl_Locations.Location_ID = tbl_Events.Location_ID WHERE (((tbl_Events.Event_Type)='Marker Visit')) ORDER BY tbl_Locations.Order_ID, tbl_Locations.Location_Name,"\
+                " tbl_Event_Group.Start_Date;"
+        outVal = connect_to_AccessDB(inQuery, inDB)
+
+        if outVal[0].lower() != "success function":
+            print("WARNING - Function defineRecords_AbsCoverByStratum - Failed - Exiting Script -  {timeFun()}")
+            exit()
+        
+        outDF = outVal[1]
+        print(f"Success:  defineRecords_AbsCoverByStratum - {timeFun()}")
+        return "success function", outDF
+
+    except:
+        print(f"Error on defineRecords_AbsCoverByStratum Function - {timeFun()}")
+        logging.exception("WARNING Script Failed - defineRecords_AbsCoverByStratum")
+        return "Failed function - 'defineRecords_AbsCoverByStratum'"
 
 #Create  Figures - Absolute Cover By Region, By Community, By Strata
-def figure_CoverByStratum(inDF):
+def figure_AbsCoverByStratum(inDF):
     try:
 
         #Open PDF to be copied to
@@ -394,41 +432,13 @@ def figure_CoverByStratum(inDF):
 
         pdf.close()
 
-        print(f"Success: figure_CoverByStratum - {timeFun()}")
+        print(f"Success: figure_AbsCoverByStratum - {timeFun()}")
         return "success function"
 
     except:
-        print(f"Error on figure_CoverByStratum Function - {timeFun()}")
-        logging.exception("WARNING Script Failed - figure_CoverByStratum")
-        return "Failed function - 'figure_CoverByStratum'"
-
-#Calculate Absolute Cover By Stratum and Community type in table 'tbl_MarkerData'
-def defineRecords_CoverByStratum():
-    try:
-        inQuery = "SELECT tbl_Locations.Location_ID, tbl_Locations.Order_ID,  tbl_Locations.Region, tbl_Locations.Location_Name,  tbl_Events.Event_ID, tbl_Event_Group.Start_Date, tbl_MarkerData.MangroveSide_Cover_Overall,"\
-                " tbl_MarkerData.MangroveSide_Cover_Tree, tbl_MarkerData.MangroveSide_Cover_Shrub, tbl_MarkerData.MangroveSide_Cover_Herb, [MangroveSide_Cover_Overall]*([MangroveSide_Cover_Tree]/100)"\
-                " AS AbsCover_Mangrove_Tree, [MangroveSide_Cover_Overall]*([MangroveSide_Cover_Shrub]/100) AS AbsCover_Mangrove_Shrub, [MangroveSide_Cover_Overall]*([MangroveSide_Cover_Herb]/100)"\
-                " AS AbsCover_Mangrove_Herb, tbl_MarkerData.MarshSide_Cover_Overall, tbl_MarkerData.MarshSide_Cover_Tree, tbl_MarkerData.MarshSide_Cover_Shrub, tbl_MarkerData.MarshSide_Cover_Herb,"\
-                " [MarshSide_Cover_Overall]*([MarshSide_Cover_Tree]/100) AS AbsCover_Marsh_Tree, [MarshSide_Cover_Overall]*([MarshSide_Cover_Shrub]/100) AS AbsCover_Marsh_Shrub,"\
-                " [MarshSide_Cover_Overall]*([MarshSide_Cover_Herb]/100) AS AbsCover_Marsh_Herb"\
-                " FROM tbl_Locations INNER JOIN ((tbl_Event_Group INNER JOIN tbl_Events ON (tbl_Event_Group.Event_Group_ID = tbl_Events.Event_Group_ID) AND (tbl_Event_Group.Event_Group_ID"\
-                " = tbl_Events.Event_Group_ID)) INNER JOIN tbl_MarkerData ON (tbl_Events.Event_ID = tbl_MarkerData.Event_ID) AND (tbl_Events.Event_ID = tbl_MarkerData.Event_ID))"\
-                " ON tbl_Locations.Location_ID = tbl_Events.Location_ID WHERE (((tbl_Events.Event_Type)='Marker Visit')) ORDER BY tbl_Locations.Order_ID, tbl_Locations.Location_Name,"\
-                " tbl_Event_Group.Start_Date;"
-        outVal = connect_to_AccessDB(inQuery, inDB)
-
-        if outVal[0].lower() != "success function":
-            print("WARNING - Function defineRecords_CoverByStratum - Failed - Exiting Script -  {timeFun()}")
-            exit()
-        
-        outDF = outVal[1]
-        print(f"Success:  defineRecords_CoverByStratum - {timeFun()}")
-        return "success function", outDF
-
-    except:
-        print(f"Error on defineRecords_CoverByStratum Function - {timeFun()}")
-        logging.exception("WARNING Script Failed - defineRecords_CoverByStratum")
-        return "Failed function - 'defineRecords_CoverByStratum'"
+        print(f"Error on figure_AbsCoverByStratum Function - {timeFun()}")
+        logging.exception("WARNING Script Failed - figure_AbsCoverByStratum")
+        return "Failed function - 'figure_AbsCoverByStratum'"
 
 #Extract Mangrove Marsh Distance Records table 'tbl_MarkerData' where Event Type = 'Marker Visit'
 def defineRecords_MarkerData():
@@ -452,6 +462,54 @@ def defineRecords_MarkerData():
         print(f"Error on defineRecords_MarkderData Function - {timeFun()}")
         logging.exception("WARNING Script Failed - defineRecords_MarkderData")
         return "Failed function - 'defineRecords_MarkderData'"
+
+#Summarize Mangrove Marsh Ecotone Values - Average Distance, Standard Error, Lower 95% Confidence Limit, Upper 95% Confidence Limit, Max and Min Values
+## Calculate the Confidence Interval Upper 95% and Lower 95% using Students T Distribution
+### Student T Distribution is defined as t_crit = np.abs(t.ppf((1-confidence)/2,dof))
+### CI Upper and lower is: (Mean +/- t_crit * SE)  
+#Output DataFrame with the summary values by Segment
+def SummarizeFigure8_1(inDF):
+    try:
+        # Calculate Average, Standard Error, and count of Distance 
+        outDf_8pt1 = (
+            inDF.groupby(['Event_Group_ID', 'Region', 'Segment'], as_index=False)
+            .agg(
+                AverageDist_M=('Distance', 'mean'),
+                StandardError=('Distance', 'sem'),
+                RecCount=('Distance', 'count'),
+                MinDifference=('Distance', 'min'),
+                MaxDifference=('Distance','max')
+            )
+            .assign(
+                DOF=lambda d: d.RecCount - 1,
+                t_crit=lambda d: np.abs(t.ppf((1 + confidence) / 2, d.DOF)),
+                LowerCI_95=lambda d: d.AverageDist_M - d.t_crit * d.StandardError,
+                UpperCI_95=lambda d: d.AverageDist_M + d.t_crit * d.StandardError,
+                SortField=lambda d: pd.to_numeric(
+                    d.Segment.str.extract(r'(\d+)')[0],
+                    errors='coerce',
+                    downcast='integer'
+                )
+            )
+            .sort_values('SortField')
+            .set_index('SortField')
+            .drop(columns=['DOF', 't_crit'])
+            )
+        
+        # Export Table to Excel
+        dateString = date.today().strftime("%Y%m%d")
+        outFull = os.path.join(outputDir, f"MangroveMarsh_Export_{dateString}.xlsx")
+        outDf_8pt1.to_excel(outFull, sheet_name = 'SOP8-1', index=False)
+
+        scriptMsg = f"EXPORTED Table 8-1 to: {outFull} - {timeFun()}"
+        print(scriptMsg)
+        logging.info(scriptMsg)
+        return "success function", outDf_8pt1
+
+    except:
+        print(f"Error on SummarizeFigure8_1 Function - {timeFun()}")
+        logging.exception("Error in SummarizeFigure8_1")
+        return "Failed function - 'SummarizeFigure8_1'"
 
 if __name__ == '__main__':
 
