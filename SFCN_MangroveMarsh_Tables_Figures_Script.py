@@ -126,7 +126,16 @@ def main():
         ########################
         # Functions for QAQC - Relative Cover By Strata and Within Strata
         ########################    
-        QAQC_RelativeCover1()
+        outVal = QAQC_RelCoverByStratum()
+        #print(outVal[0])
+        #if outVal[0].lower() != "success function":
+        #    print("WARNING - Function QAQC_RelCoverByStratum - Failed - Exiting Script")
+        #    exit()
+            
+        outVal = QAQC_RelCoverByPoint()
+        #if outVal[0].lower() != "success function":
+        #    print("WARNING - Function QAQC_RelCoverByPoint - Failed - Exiting Script")
+        #    exit()
 
         scriptMsg = f"COMPLETE - QAQC Functions - {timeFun()}"
         print(scriptMsg)
@@ -176,16 +185,15 @@ def main():
 
         logging.exception(f"WARNING Script Failed - {timeFun()}")
 
-# QAQC the Vegetation Data
-## Check for correct relative cover (100%) ACROSS strata for each location / community type
-def defineRecords_QAQC_RelCoverByStratum():
+## QAQC - Check for correct relative cover (100%) ACROSS strata for each location / community type
+def QAQC_RelCoverByStratum():
     try:
         # get data from access
         inQuery = """
         SELECT 
             Region,
-            Location_Name,
             Segment,
+            Location_Name,
             MangroveSide_Cover_Overall,
             MangroveSide_Cover_Tree,
             MangroveSide_Cover_Shrub,
@@ -200,6 +208,7 @@ def defineRecords_QAQC_RelCoverByStratum():
                 ON tbl_MarkerData.Event_ID = tbl_Events.Event_ID)
             INNER JOIN tbl_Locations 
                 ON tbl_Events.Location_ID = tbl_Locations.Location_ID
+        ORDER BY Location_Name
         """
         outVal = connect_to_AccessDB(inQuery, inDB)
 
@@ -230,35 +239,35 @@ def defineRecords_QAQC_RelCoverByStratum():
         scriptMsg = f"EXPORTED Table QAQC-1-RelCover to {outFull} - {timeFun()}"
         print(scriptMsg)
         logging.info(scriptMsg)
+        return "success function"
 
     except:
         print(f"Error on QAQC_RelativeCover1 Function - {timeFun()}")
         logging.exception("Error in QAQC_RelativeCover1")
         return "Failed function - 'QAQC_RelativeCover1'"
 
-## Check for correct relative cover (100%) WITHIN strata for each location / community type
-def defineRecords_QAQC_RelCoverByPoint():
+## QAQC - Check for correct relative cover (100%) WITHIN strata for each location / community type
+def QAQC_RelCoverByPoint():
     try:
         # get data from access
         inQuery = """
         SELECT 
             Region,
-            Location_Name,
             Segment,
-            MangroveSide_Cover_Overall,
-            MangroveSide_Cover_Tree,
-            MangroveSide_Cover_Shrub,
-            MangroveSide_Cover_Herb,
-            MarshSide_Cover_Overall,
-            MarshSide_Cover_Tree,
-            MarshSide_Cover_Shrub,
-            MarshSide_Cover_Herb
+            Location_Name,
+            CommunityType,
+            VegetationType,
+            SpeciesCode,
+            PercentCover
         FROM 
-            (tbl_MarkerData
+            ((tbl_MarkerData_Vegetation
+            INNER JOIN tbl_MarkerData
+                ON tbl_MarkerData_Vegetation.Point_ID = tbl_MarkerData.Point_ID)
             INNER JOIN tbl_Events 
                 ON tbl_MarkerData.Event_ID = tbl_Events.Event_ID)
             INNER JOIN tbl_Locations 
                 ON tbl_Events.Location_ID = tbl_Locations.Location_ID
+        ORDER BY Location_Name
         """
         outVal = connect_to_AccessDB(inQuery, inDB)
 
@@ -268,32 +277,43 @@ def defineRecords_QAQC_RelCoverByPoint():
 
         outDF = outVal[1]
 
-        # sum relative cover and check
-        outDF["sum_mangrove"] = outDF[
-            ["MangroveSide_Cover_Tree", "MangroveSide_Cover_Shrub", "MangroveSide_Cover_Herb"]
-        ].sum(axis=1)
+        # pivot and sum to see if each strata within a point = 100
+        wide_outDF_count = outDF.pivot_table(
+            index = ["Region", "Segment", "Location_Name", "CommunityType", "VegetationType"],
+            columns = "SpeciesCode",
+            values = "PercentCover",
+            aggfunc = "count"
+        )
 
-        outDF["sum_marsh"] = outDF[
-            ["MarshSide_Cover_Tree", "MarshSide_Cover_Shrub", "MarshSide_Cover_Herb"]
-        ].sum(axis=1)
+        # pivot and sum to see if each strata within a point = 100
+        wide_outDF_sum = outDF.pivot_table(
+            index = ["Region", "Segment", "Location_Name", "CommunityType", "VegetationType"],
+            columns = "SpeciesCode",
+            values = "PercentCover",
+            aggfunc = "sum"
+        )
 
-        outDF["mangrove_is_100"] = outDF["sum_mangrove"] == 100
-        outDF["marsh_is_100"] = outDF["sum_marsh"] == 100
+        wide_outDF_sum['sum_relcover'] = wide_outDF_sum.sum(axis=1)
+        wide_outDF_sum["relcover_is_100"] = wide_outDF_sum["sum_relcover"] == 100
 
         # Append DataFrame to existing excel file
         outFull = os.path.join(outputDir, f"MangroveMarsh_Export_{dateString}.xlsx")
 
         with pd.ExcelWriter(outFull, mode='a', engine="openpyxl") as writer:
-            outDF.to_excel(writer, sheet_name='QAQC-2-RelCov', index=False)
+            wide_outDF_count.to_excel(writer, sheet_name='QAQC_RelCoverByPoint_Count', index=True)
 
-        scriptMsg = f"EXPORTED Table QAQC-2-RelCover to {outFull} - {timeFun()}"
+        with pd.ExcelWriter(outFull, mode='a', engine="openpyxl") as writer:
+            wide_outDF_sum.to_excel(writer, sheet_name='QAQC_RelCoverByPoint_Sum', index=True)
+
+        scriptMsg = f"EXPORTED Table QAQC_RelCoverByPoint to {outFull} - {timeFun()}"
         print(scriptMsg)
         logging.info(scriptMsg)
+        return "success function"
 
     except:
-        print(f"Error on QAQC_RelativeCover2 Function - {timeFun()}")
-        logging.exception("Error in QAQC_RelativeCover2")
-        return "Failed function - 'QAQC_RelativeCover2'"
+        print(f"Error on QAQC_RelCoverByPoint Function - {timeFun()}")
+        logging.exception("Error in QAQC_RelCoverByPoint")
+        return "Failed function - 'QAQC_RelCoverByPoint'"
 
 # Summarize via a CrossTab/Pivot Table the Absolute Cover By Region, Community, Strata and Taxon across point locations
 #Export By Region
