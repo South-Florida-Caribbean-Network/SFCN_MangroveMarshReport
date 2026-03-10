@@ -60,11 +60,11 @@ inDB = r'Z:\Files\Vital_Signs\Mangrove_Marsh_Ecotone\data\vegetation_databases\S
 
 #Define Output Names 
 dateString = date.today().strftime("%Y%m%d")
-outName = "MangroveMarsh_AnnualTablesFigs_" + str(monitoringYear) + "_" + dateString  # Name given to the exported pre-processed
-outPDF = outputDir + "\\" + outName + ".pdf"
+outName = f"MangroveMarsh_AnnualTablesFigs_{str(monitoringYear)}_{dateString}"  # Name given to the exported pre-processed
+outPDF = os.path.join(outputDir, f"{outName}.pdf")
 
 # Logging info
-logFileName = workspace + "\\" + outName + "_logfile.txt"
+logFileName = os.path.join(workspace, f"{outName}_logfile.txt")
 logging.basicConfig(
     filename=logFileName,
     level=logging.INFO,
@@ -322,7 +322,7 @@ def defineRecords_VegCoverByPointAbsolute():
             outFull = os.path.join(outputDir, f"MangroveMarsh_Export_{dateString}.xlsx")
 
             with pd.ExcelWriter(outFull, mode='a', engine="openpyxl") as writer:
-                outDF.to_excel(writer, sheet_name='SOP8-2-AbsCov-' + region, index=False)
+                outDF.to_excel(writer, sheet_name=f"SOP8-2-AbsCov-{region}", index=False)
 
             scriptMsg = f"EXPORTED Table 8-2-AbsCov - {region} to {outFull} - {timeFun()}"
             print(scriptMsg)
