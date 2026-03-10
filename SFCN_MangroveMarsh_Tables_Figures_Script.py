@@ -7,26 +7,32 @@
 # 1) Summaries the Event Average Distance from Ground Truth values.  This includes Averge, Standard Error, Confidence Interval for defined %, and Maximum and Minimum values
 # by event/segment replicating the 'Mangrove-Marsh Ecotone Monitoring' SOP8-1 summary table. Confidence Intervals are defined using a Student T Distribution with Student T defiend as: np.abs(t.ppf((1 - confidence) / 2, dof)).
 
-# 2) Summarize via a CrossTab/Pivot Table the Absolute Vegetation by Region, Location Name (i.e. Point on Segment), by Community Type, and by Taxon (Scale is Point - single value).
+# 2) Quick QAQC of the data 
+
+# 3) Summarize via a CrossTab/Pivot Table the Absolute Vegetation by Region, Location Name (i.e. Point on Segment), by Community Type, and by Taxon (Scale is Point - single value).
 # Routine replicates the 'Mangrove-Marsh Ecotone Monitoring' SOP8-2 summary table.
 
-# 3) Calculates the Absolute Cover By Region, By Community, By Strata - data is from table  'tbl_MarkerData'. Output replicates the 'Mangrove-Marsh Ecotone Monitoring' SOP8-3 summary Figure.
+# 4) Calculates the Absolute Cover By Region, By Community, By Strata - data is from table  'tbl_MarkerData'. 
+
+# 5) Create 'Mangrove-Marsh Ecotone Monitoring' SOP8-3 summary Figure.
 
 # Output:
-# An excel spreadsheet with Tables SOP8-1 (i.e. Average Distance from Ground Truth Values), Tables SOP8-2 By region (three total) with the the Absolute Vegetation by Region, Location Name (i.e. Point on Segment),
-# by Community Type, and by Taxon, and a pdf file withe Figures SOP8-3 by region (three total) with the Absolute Cover By Region, By Community, By Strata.
+# An excel spreadsheet with:
+## Tables SOP8-1 (i.e. Average Distance from Ground Truth Values)
+## QAQC Table confirming that 1) Relative Cover of Strata = 100% & 
+## Tables SOP8-2 By region (three total) with the the Absolute Vegetation by Location Name (i.e. Point on Segment), by Community Type, and by Taxon 
+## pdf file withe Figures SOP8-3 by region (three total) with the Absolute Cover by Community and Strata.
 
 # Dependencies:
-# Python version 3.9
+# Python version 3.12
 # Pandas
-# Scipy
+# Scipyby
 
-# Python/Conda environment - py39
-# Created by: Kirk Sherrill - Data Manager South Florida Caribbean Network (Detail) - Inventory and Monitoring Division - National Park Service
-# Date Created: March 2023
-# Date Updated: March 2026
+# Date Created: March 2023 - Kirk Sherrill
+# Date Updated: March 2026 - Caitlin Andrews
 
-from datetime import date
+from datetime import date, datetime
+import logging
 import os
 import pandas as pd
 import sys
@@ -58,17 +64,43 @@ inDB = r'Z:\Files\Vital_Signs\Mangrove_Marsh_Ecotone\data\vegetation_databases\S
 dateString = date.today().strftime("%Y%m%d")
 outName = "MangroveMarsh_AnnualTablesFigs_" + str(monitoringYear) + "_" + dateString  # Name given to the exported pre-processed
 outPDF = outputDir + "\\" + outName + ".pdf"
+
+# Logging info
 logFileName = workspace + "\\" + outName + "_logfile.txt"
+logging.basicConfig(
+    filename=logFileName,
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 
 #Confidence Interval
 confidence = 0.95
 
 # Function to Get the Date/Time
 def timeFun():
-    from datetime import datetime
     b = datetime.now()
     messageTime = b.isoformat()
     return messageTime
+
+#Connect to Access DB and perform defined query - return query in a dataframe
+def connect_to_AccessDB(query, inDB):
+
+    try:
+        connStr = (r'DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};' r'DBQ=' + inDB + r';')
+        cnxn = pyodbc.connect(connStr)
+        queryDf = pd.read_sql(query, cnxn)
+        cnxn.close()
+        return "success function", queryDf
+
+    except:
+        messageTime = timeFun()
+        scriptMsg = "Error function:  connect_to_AccessDB - " +  messageTime
+        print(scriptMsg)
+        logFile = open(logFileName, "a")
+        logFile.write(scriptMsg + "\n")
+        traceback.print_exc(file=sys.stdout)
+        logFile.close()
+        return "failed function"
 
 def main():
     try:
@@ -95,7 +127,11 @@ def main():
             print("Success - Function SummarizeFigure8_1")
 
         ########################
-        #Functions for Table 8-2  - Absolute Cover Species Data by Transect and Point By Region
+        # Functions for QAQC - Relative Cover By Strata and Within Strata
+        ########################    
+        QAQC_RelativeCover1()
+        ########################
+        # Functions for Table 8-2  - Absolute Cover Species Data by Transect and Point By Region
         ########################
 
         #Summarize via a CrossTab/Pivot Table the Absolute Vegetation by Location Name (i.e. Point on Segment), by Community Type and Vegetation Type (Scale is Point - single value)
@@ -201,6 +237,67 @@ def SummarizeFigure8_1(inDF):
         print("Error on SummarizeFigure8_1 Function - " + messageTime)
         traceback.print_exc(file=sys.stdout)
         return "Failed function - 'SummarizeFigure8_1'"
+
+# QAQC the Vegetation Data
+## Check for correct relative cover (100%) across strata within community type / location
+## Check for correct relative cover (100%) within strata / community type / location
+def QAQC_RelativeCover1():
+    try:
+        # get data from access
+        inQuery = """
+        SELECT 
+            Region,
+            Location_Name,
+            Segment,
+            MangroveSide_Cover_Overall,
+            MangroveSide_Cover_Tree,
+            MangroveSide_Cover_Shrub,
+            MangroveSide_Cover_Herb,
+            MarshSide_Cover_Overall,
+            MarshSide_Cover_Tree,
+            MarshSide_Cover_Shrub,
+            MarshSide_Cover_Herb
+        FROM 
+            (tbl_MarkerData
+            INNER JOIN tbl_Events 
+                ON tbl_MarkerData.Event_ID = tbl_Events.Event_ID)
+            INNER JOIN tbl_Locations 
+                ON tbl_Events.Location_ID = tbl_Locations.Location_ID
+        """
+        outVal = connect_to_AccessDB(inQuery, inDB)
+
+        if outVal[0].lower() != "success function":
+            print(f"QAQC_RelativeCover1 Database Query - FAILED - Exiting Script - {timeFun()}")
+            return
+
+        outDF = outVal[1]
+
+        # sum relative cover and check
+        outDF["sum_mangrove"] = outDF[
+            ["MangroveSide_Cover_Tree", "MangroveSide_Cover_Shrub", "MangroveSide_Cover_Herb"]
+        ].sum(axis=1)
+
+        outDF["sum_marsh"] = outDF[
+            ["MarshSide_Cover_Tree", "MarshSide_Cover_Shrub", "MarshSide_Cover_Herb"]
+        ].sum(axis=1)
+
+        outDF["mangrove_is_100"] = outDF["sum_mangrove"] == 100
+        outDF["marsh_is_100"] = outDF["sum_marsh"] == 100
+
+        #Append DataFrame to existing excel file
+        outFull = os.path.join(outputDir, f"MangroveMarsh_Export_{dateString}.xlsx")
+
+        with pd.ExcelWriter(outFull, mode='a', engine="openpyxl") as writer:
+            outDF.to_excel(writer, sheet_name='QAQC-1-RelCov', index=False)
+
+        scriptMsg = f"Successfully Exported Table QAQC-1-RelCover to {outFull} - {timeFun()}"
+        print(scriptMsg)
+        logging.info(scriptMsg)
+
+    except:
+        print(f"Error on QAQC_RelativeCover1 Function - {timeFun()}")
+        logging.exception("Error in QAQC_RelativeCover1")
+        return "Failed function - 'QAQC_RelativeCover1'"
 
 # Summarize via a CrossTab/Pivot Table the Absolute Cover By Region, Community, Strata and Taxon across point locations
 #Export By Region
@@ -384,24 +481,6 @@ def defineRecords_MarkerData():
         print("Error on defineRecords_MarkderData Function - " + messageTime)
         traceback.print_exc(file=sys.stdout)
         return "Failed function - 'defineRecords'"
-
-#Connect to Access DB and perform defined query - return query in a dataframe
-def connect_to_AccessDB(query, inDB):
-    try:
-        connStr = (r'DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};' r'DBQ=' + inDB + r';')
-        cnxn = pyodbc.connect(connStr)
-        queryDf = pd.read_sql(query, cnxn)
-        cnxn.close()
-        return "success function", queryDf
-    except:
-        messageTime = timeFun()
-        scriptMsg = "Error function:  connect_to_AccessDB - " +  messageTime
-        print(scriptMsg)
-        logFile = open(logFileName, "a")
-        logFile.write(scriptMsg + "\n")
-        traceback.print_exc(file=sys.stdout)
-        logFile.close()
-        return "failed function"
 
 if __name__ == '__main__':
 
