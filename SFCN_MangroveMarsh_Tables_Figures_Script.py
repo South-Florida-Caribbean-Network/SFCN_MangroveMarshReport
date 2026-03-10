@@ -21,7 +21,7 @@
 ## Tables SOP8-1 (i.e. Average Distance from Ground Truth Values)
 ## QAQC Table confirming that 1) Relative Cover of Strata = 100% & 
 ## Tables SOP8-2 By region (three total) with the the Absolute Vegetation by Location Name (i.e. Point on Segment), by Community Type, and by Taxon 
-## pdf file withe Figures SOP8-3 by region (three total) with the Absolute Cover by Community and Strata.
+# A PDF file withe Figures SOP8-3 by region (three total) with the Absolute Cover by Community and Strata.
 
 # Dependencies:
 # Python version 3.12
@@ -35,8 +35,6 @@ from datetime import date, datetime
 import logging
 import os
 import pandas as pd
-import sys
-import traceback
 import numpy as np
 from scipy.stats import t
 
@@ -93,13 +91,10 @@ def connect_to_AccessDB(query, inDB):
         return "success function", queryDf
 
     except:
-        messageTime = timeFun()
-        scriptMsg = "Error function:  connect_to_AccessDB - " +  messageTime
+        scriptMsg = f"Error function:  connect_to_AccessDB - {timeFun()}"
         print(scriptMsg)
-        logFile = open(logFileName, "a")
-        logFile.write(scriptMsg + "\n")
-        traceback.print_exc(file=sys.stdout)
-        logFile.close()
+        logging.info(scriptMsg)
+        logging.exception("WARNING Script Failed - connect_to_AccessDB")
         return "failed function"
 
 def main():
@@ -114,22 +109,29 @@ def main():
         if outVal[0].lower() != "success function":
             print("WARNING - Function defineRecords_MarkerData - Failed - Exiting Script")
             exit()
-        else:
-            print("Success - Function defineRecords_MarkerData")
-            outDF = outVal[1]
+
+        print("COMPLETE: Function defineRecords_MarkerData")
+        outDF = outVal[1]
 
         #Summarize Data from tbl_MarkerData into format for Table 8-1 in SFCN Mangrove Marsh SOP.
         outVal = SummarizeFigure8_1(outDF)
         if outVal[0].lower() != "success function":
             print("WARNING - Function SummarizeFigure8_1 - Failed - Exiting Script")
             exit()
-        else:
-            print("Success - Function SummarizeFigure8_1")
+        
+        scriptMsg = f"COMPLETE: Function SummarizeFigure8_1 - {timeFun()}"
+        print(scriptMsg)
+        logging.info(scriptMsg)
 
         ########################
         # Functions for QAQC - Relative Cover By Strata and Within Strata
         ########################    
         QAQC_RelativeCover1()
+
+        scriptMsg = f"COMPLETE - QAQC Functions - {timeFun()}"
+        print(scriptMsg)
+        logging.info(scriptMsg)
+
         ########################
         # Functions for Table 8-2  - Absolute Cover Species Data by Transect and Point By Region
         ########################
@@ -139,15 +141,10 @@ def main():
         if outVal[0].lower() != "success function":
             print("WARNING - Function defineRecords_VegCoverByPointAbsolute - Failed - Exiting Script")
             exit()
-        else:
-            print("Success - Function defineRecords_VegCoverByPointAbsolute")
 
-        messageTime = timeFun()
-        scriptMsg = "Successfully Finished Processing - SFCN_MangroveMash_Table_8-2 - " + messageTime
+        scriptMsg = f"COMPLETE: SFCN_MangroveMash_Table_8-2 - {timeFun()}"
         print(scriptMsg)
-        logFile = open(logFileName, "a")
-        logFile.write(scriptMsg + "\n")
-        logFile.close()
+        logging.info(scriptMsg)
 
         ########################
         # Functions for Figure 8-3  - Calculate the Absolute Cover By Region, By Community, By Strata - data is from table  'tbl_MarkerData'
@@ -158,35 +155,26 @@ def main():
         if outVal[0].lower() != "success function":
             print("WARNING - Function defineRecords_CoverByStratum - Failed - Exiting Script")
             exit()
-        else:
-            print("Success - Function defineRecords_CoverByStratum")
-            outDF = outVal[1]
+
+        outDF = outVal[1]
 
         #Figures for Marker Point Stratum By Region - Stacked Top Marsh, Botom Mangrove
         outVal = figure_CoverByStratum(outDF)
         if outVal.lower() != "success function":
             print("WARNING - Function figure_CoverByStratum - Failed - Exiting Script")
             exit()
-        else:
-            print("Success - Function figure_CoverByStratum")
 
-        messageTime = timeFun()
-        scriptMsg = "Successfully Finished Processing - SFCN_MangroveMash_Tables_Figures_8-3 - " + messageTime
+        scriptMsg = f"COMPLETE - SFCN_MangroveMash_Tables_Figures_8-3"
         print(scriptMsg)
-        logFile = open(logFileName, "a")
-        logFile.write(scriptMsg + "\n")
-        logFile.close()
+        logging.info(scriptMsg)
 
+        scriptMsg = f"ALL COMPLETE - {timeFun()}"
+        print(scriptMsg)
+        logging.info(scriptMsg)
 
     except:
 
-        messageTime = timeFun()
-        scriptMsg = "WARNING Script Failed - " + messageTime
-        print (scriptMsg)
-        logFile = open(logFileName, "a")
-        logFile.write(scriptMsg + "\n")
-        traceback.print_exc(file=sys.stdout)
-        logFile.close()
+        logging.exception(f"WARNING Script Failed - {timeFun()}")
 
 #Summarize Mangrove Marsh Ecotone Values - Average Distance, Standard Error, Lower 95% Confidence Limit, Upper 95% Confidence Limit, Max and Min Values
 ## Calculate the Confidence Interval Upper 95% and Lower 95% using Students T Distribution
@@ -221,21 +209,19 @@ def SummarizeFigure8_1(inDF):
             .drop(columns=['DOF', 't_crit'])
             )
         
-        #Export Table to Excel
+        # Export Table to Excel
         dateString = date.today().strftime("%Y%m%d")
-        outFull = outputDir + "\MangroveMarsh_Export_" + dateString + ".xlsx"
+        outFull = os.path.join(outputDir, f"MangroveMarsh_Export_{dateString}.xlsx")
         outDf_8pt1.to_excel(outFull, sheet_name = 'SOP8-1', index=False)
-        messageTime = timeFun()
-        scriptMsg=  ("Successfully Exported Table 8-1 to: " + outFull + " - " + messageTime)
+
+        scriptMsg = f"EXPORTED Table 8-1 to: {outFull} - {timeFun()}"
         print(scriptMsg)
-        logFile = open(logFileName, "a")
-        logFile.write(scriptMsg + "\n")
-        logFile.close()
+        logging.info(scriptMsg)
         return "success function", outDf_8pt1
+
     except:
-        messageTime = timeFun()
-        print("Error on SummarizeFigure8_1 Function - " + messageTime)
-        traceback.print_exc(file=sys.stdout)
+        print(f"Error on SummarizeFigure8_1 Function - {timeFun()}")
+        logging.exception("Error in SummarizeFigure8_1")
         return "Failed function - 'SummarizeFigure8_1'"
 
 # QAQC the Vegetation Data
@@ -284,13 +270,13 @@ def QAQC_RelativeCover1():
         outDF["mangrove_is_100"] = outDF["sum_mangrove"] == 100
         outDF["marsh_is_100"] = outDF["sum_marsh"] == 100
 
-        #Append DataFrame to existing excel file
+        # Append DataFrame to existing excel file
         outFull = os.path.join(outputDir, f"MangroveMarsh_Export_{dateString}.xlsx")
 
         with pd.ExcelWriter(outFull, mode='a', engine="openpyxl") as writer:
             outDF.to_excel(writer, sheet_name='QAQC-1-RelCov', index=False)
 
-        scriptMsg = f"Successfully Exported Table QAQC-1-RelCover to {outFull} - {timeFun()}"
+        scriptMsg = f"EXPORTED Table QAQC-1-RelCover to {outFull} - {timeFun()}"
         print(scriptMsg)
         logging.info(scriptMsg)
 
@@ -302,6 +288,7 @@ def QAQC_RelativeCover1():
 # Summarize via a CrossTab/Pivot Table the Absolute Cover By Region, Community, Strata and Taxon across point locations
 #Export By Region
 def defineRecords_VegCoverByPointAbsolute():
+
     try:
         dateString = date.today().strftime("%Y%m%d")
         # Process By Region
@@ -323,31 +310,28 @@ def defineRecords_VegCoverByPointAbsolute():
                 " ORDER BY tbl_MarkerData_Vegetation.CommunityType, tbl_MarkerData_Vegetation.VegetationType, tlu_Vegetation.ScientificName"\
                 " PIVOT tbl_Locations.Location_Name;"
             outVal = connect_to_AccessDB(inQuery, inDB)
+
             if outVal[0].lower() != "success function":
-                messageTime = timeFun()
-                print("WARNING - Function defineRecords_VegCoverBySegment - " + messageTime + " - Failed - Exiting Script")
+                print(f"WARNING - Function defineRecords_VegCoverBySegment - Failed - Exiting Script- {timeFun()}")
                 exit()
-            else:
-                outDF = outVal[1]
-                messageTime = timeFun()
-                scriptMsg = "Success:  defineRecords_VegCoverBySegment" + messageTime
-                print(scriptMsg)
-                #Define Export .csv file
-                outFull = outputDir + "\MangroveMarsh_Export_" + dateString + ".xlsx"
-                #Append DataFrame to existing excel file
-                with pd.ExcelWriter(outFull, mode='a', engine="openpyxl") as writer:
-                    outDF.to_excel(writer, sheet_name='SOP8-2-AbsCov-' + region, index=False)
-                messageTime = timeFun()
-                scriptMsg = ("Successfully Exported Table 8-2-AbsCov - " + region + " - to: " + outFull + " - " + messageTime)
-                print(scriptMsg)
-                logFile = open(logFileName, "a")
-                logFile.write(scriptMsg + "\n")
-                logFile.close()
+
+            outDF = outVal[1]
+            print(f"Success: defineRecords_VegCoverBySegment - {timeFun()}")
+
+            # Append DataFrame to existing excel file
+            outFull = os.path.join(outputDir, f"MangroveMarsh_Export_{dateString}.xlsx")
+
+            with pd.ExcelWriter(outFull, mode='a', engine="openpyxl") as writer:
+                outDF.to_excel(writer, sheet_name='SOP8-2-AbsCov-' + region, index=False)
+
+            scriptMsg = f"EXPORTED Table 8-2-AbsCov - {region} to {outFull} - {timeFun()}"
+            print(scriptMsg)
+            logging.info(scriptMsg)
+
         return "success function", outDF
     except:
-        messageTime = timeFun()
-        print("Error on defineRecords_VegCoverByPointAbsolute Function - " + messageTime)
-        traceback.print_exc(file=sys.stdout)
+        print(f"Error on defineRecords_VegCoverByPointAbsolute - {timeFun()}")
+        logging.exception("WARNING Script Failed - defineRecords_VegCoverByPointAbsolute")
         return "Failed function - 'defineRecords_VegCoverByPointAbsolute'"
 
 #Create  Figures - Absolute Cover By Region, By Community, By Strata
@@ -404,27 +388,19 @@ def figure_CoverByStratum(inDF):
             figure = mp.pyplot.gcf()
             pdf.savefig(figure)
 
-            messageTime = timeFun()
-            scriptMsg = "Successfully Exported Figures Region:" + region + " - " + messageTime
+            scriptMsg = f"EXPORTED Figures Region: {region} - {timeFun()}"
             print(scriptMsg)
-            logFile = open(logFileName, "a")
-            logFile.write(scriptMsg + "\n")
-            logFile.close()
+            logging.info(scriptMsg)
 
         pdf.close()
 
-        messageTime = timeFun()
-        scriptMsg = "Success:  figure_CoverByStratum" + messageTime
-        print(scriptMsg)
-
-
+        print(f"Success: figure_CoverByStratum - {timeFun()}")
         return "success function"
 
     except:
-        messageTime = timeFun()
-        print("Error on figure_CoverByStratum Function - " + messageTime)
-        traceback.print_exc(file=sys.stdout)
-        return "Failed function - 'defineRecords_CoverByStratum'"
+        print(f"Error on figure_CoverByStratum Function - {timeFun()}")
+        logging.exception("WARNING Script Failed - figure_CoverByStratum")
+        return "Failed function - 'figure_CoverByStratum'"
 
 #Calculate Absolute Cover By Stratum and Community type in table 'tbl_MarkerData'
 def defineRecords_CoverByStratum():
@@ -440,20 +416,18 @@ def defineRecords_CoverByStratum():
                 " ON tbl_Locations.Location_ID = tbl_Events.Location_ID WHERE (((tbl_Events.Event_Type)='Marker Visit')) ORDER BY tbl_Locations.Order_ID, tbl_Locations.Location_Name,"\
                 " tbl_Event_Group.Start_Date;"
         outVal = connect_to_AccessDB(inQuery, inDB)
+
         if outVal[0].lower() != "success function":
-            messageTime = timeFun()
-            print("WARNING - Function defineRecords_CoverByStratum - " + messageTime + " - Failed - Exiting Script")
+            print("WARNING - Function defineRecords_CoverByStratum - Failed - Exiting Script -  {timeFun()}")
             exit()
-        else:
-            outDF = outVal[1]
-            messageTime = timeFun()
-            scriptMsg = "Success:  defineRecords_CoverByStratum" + messageTime
-            print(scriptMsg)
-            return "success function", outDF
+        
+        outDF = outVal[1]
+        print(f"Success:  defineRecords_CoverByStratum - {timeFun()}")
+        return "success function", outDF
+
     except:
-        messageTime = timeFun()
-        print("Error on defineRecords_CoverByStratum Function - " + messageTime)
-        traceback.print_exc(file=sys.stdout)
+        print(f"Error on defineRecords_CoverByStratum Function - {timeFun()}")
+        logging.exception("WARNING Script Failed - defineRecords_CoverByStratum")
         return "Failed function - 'defineRecords_CoverByStratum'"
 
 #Extract Mangrove Marsh Distance Records table 'tbl_MarkerData' where Event Type = 'Marker Visit'
@@ -467,20 +441,17 @@ def defineRecords_MarkerData():
 
         outVal = connect_to_AccessDB(inQuery, inDB)
         if outVal[0].lower() != "success function":
-            messageTime = timeFun()
-            print("WARNING - Function defineRecords_MarkerData - " + messageTime + " - Failed - Exiting Script")
+            print(f"WARNING - Function defineRecords_MarkerData - Failed - Exiting Script - {timeFun()}")
             exit()
-        else:
-            outDF = outVal[1]
-            messageTime = timeFun()
-            scriptMsg = "Success:  defineRecords_MarkerData" + messageTime
-            print(scriptMsg)
-            return "success function", outDF
+            
+        outDF = outVal[1]
+        print(f"Success:  defineRecords_MarkerData - {timeFun()}")
+        return "success function", outDF
+
     except:
-        messageTime = timeFun()
-        print("Error on defineRecords_MarkderData Function - " + messageTime)
-        traceback.print_exc(file=sys.stdout)
-        return "Failed function - 'defineRecords'"
+        print(f"Error on defineRecords_MarkderData Function - {timeFun()}")
+        logging.exception("WARNING Script Failed - defineRecords_MarkderData")
+        return "Failed function - 'defineRecords_MarkderData'"
 
 if __name__ == '__main__':
 
