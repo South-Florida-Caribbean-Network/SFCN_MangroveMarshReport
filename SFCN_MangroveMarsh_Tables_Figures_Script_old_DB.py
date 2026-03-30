@@ -4,30 +4,31 @@
 # Description:  Routine to Summarize Mangrove Marsh Monitoring data including output tables and figures for annual reporting.
 
 # Code performs the following routines:
-# 1) Summaries the Event Average Distance from Ground Truth values.  This includes Averge, Standard Error, Confidence Interval for defined %, and Maximum and Minimum values
-# by event/segment replicating the 'Mangrove-Marsh Ecotone Monitoring' SOP8-1 summary table. Confidence Intervals are defined using a Student T Distribution with Student T defiend as: np.abs(t.ppf((1 - confidence) / 2, dof)).
+# 1) Event/Segment Average Distance from Ground Truth values.  
+# # Routine replicates the 'Mangrove-Marsh Ecotone Monitoring' SOP8-1 summary table. 
 
-# 2) Quick QAQC of the data - Relative Cover checks
+# 2) Quick QAQC of the data 
 
-# 3) Summarize via a CrossTab/Pivot Table the Absolute Vegetation by Region, Location Name (i.e. Point on Segment),
-# by Community Type, and by Taxon (Scale is Point - single value).
-# Routine replicates the 'Mangrove-Marsh Ecotone Monitoring' SOP8-2 summary table.
+# 3) Absolute Vegetation by Region, Location Name, Community Type, and Taxon (Scale is Point - single value).
+# # Routine replicates the 'Mangrove-Marsh Ecotone Monitoring' SOP8-2 summary table.
 
-# 4) Calculates the Absolute Cover By Region, By Community, By Strata - data is from table  'tbl_MarkerData'. 
+# 4) Absolute Cover by Region, Community, and  Strata - data is from table  'tbl_MarkerData'. 
 
 # 5) Create 'Mangrove-Marsh Ecotone Monitoring' SOP8-3 summary Figure.
 
 # Output:
 # An excel spreadsheet with:
-## Tables SOP8-1 (i.e. Average Distance from Ground Truth Values)
-## QAQC Table confirming that 1) Relative Cover of Strata = 100% & 
-## Tables SOP8-2 By region (three total) with the the Absolute Vegetation by Location Name (i.e. Point on Segment), by Community Type, and by Taxon 
-# A PoutVal file withe Figures SOP8-3 by region (three total) with the Absolute Cover by Community and Strata.
+## Tables SOP8-1 (i.e. Average Distance from Ground Truth Values) - NOT CURRENTLY ACTIVE
+## QAQC Table confirming that 
+### 1) Relative Cover across the strata = 100% 
+### 2) Relative Cover within a strata = 100%
+## Tables SOP8-2 (Absolute Vegetation Cover by Taxon, Community and Strata)
+## Table of data SOP 8-3 (Absolute Vegetation Cover by Community and Strata)
+# A PDF file withe Figures SOP8-3 by region (three total) with the Absolute Cover by Community and Strata.
 
 # Dependencies:
 # Python version 3.12
 # Pandas
-# Scipyby
 
 # Date Created: March 2023 - Kirk Sherrill
 # Date Updated: March 2026 - Caitlin Andrews
@@ -81,14 +82,16 @@ def timeFun():
     messageTime = b.isoformat()
     return messageTime
 
-#Connect to Access DB and perform defined query - return query in a dataframe
+# Connect to Access DB and perform defined query - return query in a dataframe
 def connect_to_AccessDB(query, inDB):
+
     try:
         connStr = (r'DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};' r'DBQ=' + inDB + r';')
         cnxn = pyodbc.connect(connStr)
         queryoutVal = pd.read_sql(query, cnxn)
         cnxn.close()
         return "success function", queryoutVal
+    
     except:
         scriptMsg = f"Error function:  connect_to_AccessDB - {timeFun()}"
         print(scriptMsg)
@@ -96,7 +99,7 @@ def connect_to_AccessDB(query, inDB):
         logging.exception("WARNING Script Failed - connect_to_AccessDB")
         return "failed function"
 
-# helper function for coomputing absolute cover
+# helper function for computing absolute cover
 def compute_cover(row):
     ct = row["CommunityType"]
     vt = row["VegetationType"]
@@ -144,13 +147,12 @@ def main():
         # Functions for QAQC - Relative Cover By Strata and Within Strata
         ########################    
         outVal = QAQC_RelCoverByStratum()
-        print(outVal[0])
-        if outVal[0].lower() != "s":
+        if outVal.lower() != "success function":
             print("WARNING - Function QAQC_RelCoverByStratum - Failed - Exiting Script")
             exit()
             
         outVal = QAQC_RelCoverByPoint()
-        if outVal[0].lower() != "s":
+        if outVal.lower() != "success function":
            print("WARNING - Function QAQC_RelCoverByPoint - Failed - Exiting Script")
            exit()
 
@@ -158,13 +160,13 @@ def main():
         print(scriptMsg)
         logging.info(scriptMsg)
 
-        ########################
-        # Functions for Table 8-2  - Absolute Cover Species Data by Transect and Point By Region
-        ########################
+        # ########################
+        # # Functions for Table 8-2  - Absolute Cover Species Data by Transect and Point By Region
+        # ########################
 
         # #Summarize via a CrossTab/Pivot Table the Absolute Vegetation by Location Name (i.e. Point on Segment), by Community Type and Vegetation Type (Scale is Point - single value)
         outVal = defineRecords_AbsCoverByPoint()
-        if outVal[0].lower() != "success function":
+        if outVal.lower() != "success function":
             print("WARNING - Function defineRecords_AbsCoverByPoint - Failed - Exiting Script")
             exit()
 
@@ -415,7 +417,7 @@ def defineRecords_AbsCoverByPoint():
         print(scriptMsg)
         logging.info(scriptMsg)
 
-        return "success function", outVal
+        return "success function"
     except:
         print(f"Error on defineRecords_AbsCoverByPoint - {timeFun()}")
         logging.exception("WARNING Script Failed - defineRecords_AbsCoverByPoint")
@@ -426,9 +428,8 @@ def defineRecords_AbsCoverByStratum():
     try:
         in_query = """
         SELECT
-            geo_Locations.Loc_Name AS Location_Name,
+            geo_Locations.Loc_Name_Short AS Location_Name,
             tbl_Events.Event_ID,
-            tbl_Events.Start_Date,
 
             tbl_MarkerData.MangroveSide_Cover_Overall,
             tbl_MarkerData.MangroveSide_Cover_Tree,
@@ -459,7 +460,7 @@ def defineRecords_AbsCoverByStratum():
 
         WHERE
             tbl_Events.Event_Type = 'Marker Visit'
-            AND Loc_Name IN ('01_1', '01_2', '01_3', '01_4', '02_1', '02_2', '02_3', '02_4',
+            AND Loc_Name_Short IN ('01_1', '01_2', '01_3', '01_4', '02_1', '02_2', '02_3', '02_4',
                 '03_1', '03_2', '03_3', '03_4', '04_1', '04_2', '04_3', '04_4',
                 '05_1', '05_2', '05_3', '05_4', '06_1', '06_2', '06_3', '06_4',
                 '07_1', '07_2', '07_3', '07_4', '08_1', '08_2', '08_3', '08_4',
@@ -468,30 +469,45 @@ def defineRecords_AbsCoverByStratum():
                 '13_1', '13_2', '13_3', '13_4', '14_1', '14_2', '14_3', '14_4')
 
         ORDER BY
-            geo_Locations.Loc_Name,
+            geo_Locations.Loc_Name_Short,
             tbl_Events.Start_Date;
         """
 
-        outVal = connect_to_AccessDB(inQuery, inDB)
+        outVal = connect_to_AccessDB(in_query, inDB)
 
         if outVal[0].lower() != "success function":
             print("WARNING - Function defineRecords_AbsCoverByStratum - Failed - Exiting Script -  {timeFun()}")
             exit()
         
-        outVal = outVal[1]
-        # join with regions table
+        outVal = pd.DataFrame(outVal[1])
 
+        # create then join with regions table
+        regions = np.repeat(
+            ["Turner River", "Shark Slough", "Taylor Slough"],
+            [20, 16, 20]
+        )
+        regions_df = pd.DataFrame({"Region": regions})
+
+        # Generate formatted codes like 01-01, 01-02, ..., 02-01, ...
+        group_size = 4
+        regions_df["Location_Name"] = [
+            f"{i//group_size + 1:02d}-{i%group_size + 1:02d}"
+            for i in range(len(regions_df))
+        ]
+
+        outVal = pd.merge(regions_df, outVal, on = "Location_Name")
+        
         # Append DataFrame to existing excel file
         outFull = os.path.join(outputDir, f"MangroveMarsh_Export_oldDB_{dateString}.xlsx")
 
         with pd.ExcelWriter(outFull, mode='a', engine="openpyxl") as writer:
-            outVal.to_excel(writer, sheet_name="AbsCovByStratum", index=True)
+            outVal.to_excel(writer, sheet_name="SOP8-3-AbsCovByStratum", index=False)
 
         scriptMsg = f"EXPORTED Table AbsCovByStratum to {outFull} - {timeFun()}"
         print(scriptMsg)
         logging.info(scriptMsg)
         
-        print(f"Success:  defineRecords_AbsCoverByStratum - {timeFun()}")
+        print(f"Success: defineRecords_AbsCoverByStratum - {timeFun()}")
         return "success function", outVal
 
     except:
@@ -499,7 +515,7 @@ def defineRecords_AbsCoverByStratum():
         logging.exception("WARNING Script Failed - defineRecords_AbsCoverByStratum")
         return "Failed function - 'defineRecords_AbsCoverByStratum'"
 
-#Create  Figures - Absolute Cover By Region, By Community, By Strata
+#Create Figures - Absolute Cover By Region, By Community, By Strata
 def figure_AbsCoverByStratum(inoutVal):
     try:
 
