@@ -408,7 +408,7 @@ def defineRecords_AbsCoverByPoint():
 
         new_order = [
             f"{i//4 + 1}_{i%4 + 1}"
-            for i in range(len(df))
+            for i in range(len(pivot_df.columns))
         ]
         pivot_df = pivot_df[new_order] 
 
