@@ -173,7 +173,7 @@ def main():
             print("WARNING - Function defineRecords_AbsCoverByPoint - Failed - Exiting Script")
             exit()
 
-        scriptMsg = f"COMPLETE: SFCN_MangroveMash_Table_8-2 - {timeFun()}"
+        scriptMsg = f"COMPLETE: SFCN_MangroveMarsh_Table_8-2 - {timeFun()}"
         print(scriptMsg)
         logging.info(scriptMsg)
 
