@@ -57,12 +57,15 @@ outputDir = current_directory  #Output Directory
 workspace = current_directory  # Workspace Folder
 monitoringYear = 2015  #Monitoring Year of Mangrove Marsh data being processing
 
+# create folder for the old DB summaries and logfile
+os.mkdir("./MME_Report_Pilot_DB")
+
 #Mangrove Marsh Access Database and location
-inDB = r'Z:\Files\Vital_Signs\Mangrove_Marsh_Ecotone\data\vegetation_databases\2009-2015_SFCN_Mangrove_Marsh_Ecotone.mdb'
+inDB = r'V:\Vital_Signs\Mangrove_Marsh_Ecotone\data\vegetation_databases\2009-2015_SFCN_Mangrove_Marsh_Ecotone.mdb'
 
 # --- Output names ---
 dateString = date.today().strftime("%Y%m%d")
-outName = f"MangroveMarsh_AnnualTablesFigs_{str(monitoringYear)}_{dateString}"  # Name given to the exported pre-processed
+outName = f"MME_Report_Pilot_DB/MangroveMarsh_AnnualTablesFigs_Pilot_{str(monitoringYear)}_{dateString}"  # Name given to the exported pre-processed
 outPoutVal = os.path.join(outputDir, f"{outName}.poutVal")
 
 # --- Logging ---
@@ -248,7 +251,7 @@ def QAQC_RelCoverByStratum():
         outVal["marsh_is_100"] = outVal["sum_marsh"] == 100
 
         # Write DataFrame to excel file
-        outFull = os.path.join(outputDir, f"MangroveMarsh_Export_oldDB_{dateString}.xlsx")
+        outFull = os.path.join(outputDir, f"MME_Report_Pilot_DB/MangroveMarsh_Export_pilotDB_{dateString}.xlsx")
         outVal.to_excel(outFull, sheet_name='QAQC_RelCovByStrata', index=False)
 
         scriptMsg = f"EXPORTED Table QAQC-RelCoverByStratum to {outFull} - {timeFun()}"
@@ -312,7 +315,7 @@ def QAQC_RelCoverByPoint():
         wide_outVal_sum["relcover_is_100"] = wide_outVal_sum["sum_relcover"] == 100
 
         # Append DataFrame to existing excel file
-        outFull = os.path.join(outputDir, f"MangroveMarsh_Export_oldDB_{dateString}.xlsx")
+        outFull = os.path.join(outputDir, f"MME_Report_Pilot_DB/MangroveMarsh_Export_pilotDB_{dateString}.xlsx")
 
         with pd.ExcelWriter(outFull, mode='a', engine="openpyxl") as writer:
             wide_outVal_count.to_excel(writer, sheet_name='QAQC_RelCoverByPoint_Count', index=True)
@@ -408,7 +411,7 @@ def defineRecords_AbsCoverByPoint():
         )
 
         # Append DataFrame to existing excel file
-        outFull = os.path.join(outputDir, f"MangroveMarsh_Export_oldDB_{dateString}.xlsx")
+        outFull = os.path.join(outputDir, f"MME_Report_Pilot_DB/MangroveMarsh_Export_pilotDB_{dateString}.xlsx")
 
         with pd.ExcelWriter(outFull, mode='a', engine="openpyxl") as writer:
             pivot_df.to_excel(writer, sheet_name=f"SOP8-2-AbsCov", index=True)
@@ -498,7 +501,7 @@ def defineRecords_AbsCoverByStratum():
         outVal = pd.merge(regions_df, outVal, on = "Location_Name")
         
         # Append DataFrame to existing excel file
-        outFull = os.path.join(outputDir, f"MangroveMarsh_Export_oldDB_{dateString}.xlsx")
+        outFull = os.path.join(outputDir, f"MME_Report_Pilot_DB/MangroveMarsh_Export_pilotDB_{dateString}.xlsx")
 
         with pd.ExcelWriter(outFull, mode='a', engine="openpyxl") as writer:
             outVal.to_excel(writer, sheet_name="SOP8-3-AbsCovByStratum", index=False)
@@ -639,7 +642,7 @@ def SummarizeFigure8_1(inoutVal):
         
         # Export Table to Excel
         dateString = date.today().strftime("%Y%m%d")
-        outFull = os.path.join(outputDir, f"MangroveMarsh_Export_oldDB_{dateString}.xlsx")
+        outFull = os.path.join(outputDir, f"MangroveMarsh_Export_pilotDB_{dateString}.xlsx")
         outVal_8pt1.to_excel(outFull, sheet_name = 'SOP8-1', index=False)
 
         scriptMsg = f"EXPORTED Table 8-1 to: {outFull} - {timeFun()}"

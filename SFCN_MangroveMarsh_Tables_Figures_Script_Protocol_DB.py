@@ -57,12 +57,15 @@ outputDir = current_directory  #Output Directory
 workspace = current_directory  # Workspace Folder
 monitoringYear = 2020  #Monitoring Year of Mangrove Marsh data being processing
 
+# create folder for the old DB summaries and logfile
+os.mkdir("./MME_Report_Protocol_DB")
+
 #Mangrove Marsh Access Database and location
-inDB = r'Z:\Files\Vital_Signs\Mangrove_Marsh_Ecotone\data\vegetation_databases\SFCN_Mangrove_Marsh_Ecotone_tabular_20260109.mdb'
+inDB = r'V:\Vital_Signs\Mangrove_Marsh_Ecotone\data\vegetation_databases\SFCN_Mangrove_Marsh_Ecotone_tabular_20260109.mdb'
 
 #Define Output Names 
 dateString = date.today().strftime("%Y%m%d")
-outName = f"MangroveMarsh_AnnualTablesFigs_{str(monitoringYear)}_{dateString}"  # Name given to the exported pre-processed
+outName = f"MME_Report_Protocol_DB/MangroveMarsh_AnnualTablesFigs_Protocol_{str(monitoringYear)}_{dateString}"  # Name given to the exported pre-processed
 outPDF = os.path.join(outputDir, f"{outName}.pdf")
 
 # Logging info
@@ -170,7 +173,7 @@ def main():
             print("WARNING - Function defineRecords_AbsCoverByPoint - Failed - Exiting Script")
             exit()
 
-        scriptMsg = f"COMPLETE: SFCN_MangroveMash_Table_8-2 - {timeFun()}"
+        scriptMsg = f"COMPLETE: SFCN_MangroveMarsh_Table_8-2 - {timeFun()}"
         print(scriptMsg)
         logging.info(scriptMsg)
 
@@ -193,7 +196,7 @@ def main():
             print("WARNING - Function figure_AbsCoverByStratum - Failed - Exiting Script")
             exit()
 
-        scriptMsg = f"COMPLETE - SFCN_MangroveMash_Tables_Figures_8-3"
+        scriptMsg = f"COMPLETE - SFCN_MangroveMarsh_Tables_Figures_8-3"
         print(scriptMsg)
         logging.info(scriptMsg)
 
@@ -250,7 +253,7 @@ def QAQC_RelCoverByStratum():
         outDF["marsh_is_100"] = outDF["sum_marsh"] == 100
 
         # Append DataFrame to existing excel file
-        outFull = os.path.join(outputDir, f"MangroveMarsh_Export_newDB_{dateString}.xlsx")
+        outFull = os.path.join(outputDir, f"MME_Report_Protocol_DB/MangroveMarsh_Export_protocolDB_{dateString}.xlsx")
 
         #with pd.ExcelWriter(outFull, mode='a', engine="openpyxl") as writer: 
         outDF.to_excel(outFull, sheet_name='QAQC_RelCovByStrata', index=False)
@@ -317,7 +320,7 @@ def QAQC_RelCoverByPoint():
         wide_outDF_sum["relcover_is_100"] = wide_outDF_sum["sum_relcover"] == 100
 
         # Append DataFrame to existing excel file
-        outFull = os.path.join(outputDir, f"MangroveMarsh_Export_newDB_{dateString}.xlsx")
+        outFull = os.path.join(outputDir, f"MME_Report_Protocol_DB/MangroveMarsh_Export_protocolDB_{dateString}.xlsx")
 
         with pd.ExcelWriter(outFull, mode='a', engine="openpyxl") as writer:
             wide_outDF_count.to_excel(writer, sheet_name='QAQC_RelCoverByPoint_Count', index=True)
@@ -408,12 +411,12 @@ def defineRecords_AbsCoverByPoint():
 
         new_order = [
             f"{i//4 + 1}_{i%4 + 1}"
-            for i in range(len(pivot_df.columns))
+            for i in range(len(pivot_df))
         ]
         pivot_df = pivot_df[new_order] 
 
         # Append DataFrame to existing excel file
-        outFull = os.path.join(outputDir, f"MangroveMarsh_Export_newDB_{dateString}.xlsx")
+        outFull = os.path.join(outputDir, f"MME_Report_Protocol_DB/MangroveMarsh_Export_protocolDB_{dateString}.xlsx")
 
         with pd.ExcelWriter(outFull, mode='a', engine="openpyxl") as writer:
             pivot_df.to_excel(writer, sheet_name=f"SOP8-2-AbsCov", index=True)
@@ -478,7 +481,7 @@ def defineRecords_AbsCoverByStratum():
         outDF = outVal[1]
         # Append DataFrame to existing excel file
         outVal = pd.DataFrame(outVal[1])
-        outFull = os.path.join(outputDir, f"MangroveMarsh_Export_newDB_{dateString}.xlsx")
+        outFull = os.path.join(outputDir, f"MME_Report_Protocol_DB/MangroveMarsh_Export_protocolDB_{dateString}.xlsx")
 
         with pd.ExcelWriter(outFull, mode='a', engine="openpyxl") as writer:
             outVal.to_excel(writer, sheet_name="SOP8-3-AbsCovByStratum", index=False)
@@ -615,7 +618,7 @@ def SummarizeFigure8_1(inDF):
         
         # Export Table to Excel
         dateString = date.today().strftime("%Y%m%d")
-        outFull = os.path.join(outputDir, f"MangroveMarsh_Export_newDB_{dateString}.xlsx")
+        outFull = os.path.join(outputDir, f"MME_Report_Protocol_DB/MangroveMarsh_Export_protocolDB_{dateString}.xlsx")
         outDf_8pt1.to_excel(outFull, sheet_name = 'SOP8-1', index=False)
 
         scriptMsg = f"EXPORTED Table 8-1 to: {outFull} - {timeFun()}"
